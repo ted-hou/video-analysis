@@ -88,8 +88,8 @@ for iDir = 1:length(dirs)
 			end
 			for iVid = 1:length(vidFiles)
 				vid = VideoReader(vidFiles{iVid});
-				hFigure = figure('Name', vidFiles{iVid});
-				hAxes = axes(hFigure);
+				hFigure(iVid) = figure('Name', vidFiles{iVid});
+				hAxes = axes(hFigure(iVid));
 				img = read(vid, 1);
 				image(hAxes, img);
 				axis(hAxes, 'image');
@@ -99,12 +99,13 @@ for iDir = 1:length(dirs)
 			crop = round(transpose(reshape([hRect.Position], 4, [])));
 			Params(iDir).Video(1).Crop = crop(1, :);
 			Params(iDir).Video(2).Crop = crop(2, :);
+			close(hFigure)
 		% Selected 'use individual crop params'
 		elseif (islogical(applyCropParamsToAll) && ~applyCropParamsToAll)
 			for iVid = 1:length(vidFiles)
 				vid = VideoReader(vidFiles{iVid});
-				hFigure = figure('Name', vidFiles{iVid});
-				hAxes = axes(hFigure);
+				hFigure(iVid) = figure('Name', vidFiles{iVid});
+				hAxes = axes(hFigure(iVid));
 				img = read(vid, 1);
 				image(hAxes, img);
 				axis(hAxes, 'image');
@@ -112,7 +113,9 @@ for iDir = 1:length(dirs)
 			end
 			input('Say something nice to me to continue...\n', 's');
 			Params(iDir).Video(1).Crop = crop(1, :);
-			Params(iDir).Video(2).Crop = crop(2, :);		% Using previous crop params
+			Params(iDir).Video(2).Crop = crop(2, :);
+			close(hFigure)
+		% Using previous crop params
 		elseif (islogical(applyCropParamsToAll) && applyCropParamsToAll)
 			Params(iDir).Video(1).Crop = Params(iDir - 1).Video(1).Crop;
 			Params(iDir).Video(2).Crop = Params(iDir - 1).Video(2).Crop;
