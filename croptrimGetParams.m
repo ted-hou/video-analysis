@@ -26,8 +26,8 @@ for iDir = 1:length(dirs)
 		% TODO: handle more than 2 videos
 		load(matFile, 'obj');
 		% Time is stored as number of *days* since a start point. This simply will not suffice. The Grad Student must elect to have it converted to seconds.
-		t1 		= rem([obj.Cameras(1).Camera.EventLog.Timestamp], 1)*24*3600;
-		t2 		= rem([obj.Cameras(2).Camera.EventLog.Timestamp], 1)*24*3600;
+		t1 		= [obj.Cameras(1).Camera.EventLog.Timestamp];
+		t2 		= [obj.Cameras(2).Camera.EventLog.Timestamp];
 		frame1 	= [obj.Cameras(1).Camera.EventLog.FrameNumber];
 		frame2 	= [obj.Cameras(2).Camera.EventLog.FrameNumber];
 
