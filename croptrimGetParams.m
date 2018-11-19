@@ -21,6 +21,11 @@ for iDir = 1:length(dirs)
 
 		dirname = vidFiles(1).folder;
 		vidFiles = cellfun(@(filename) [dirname, '\', filename], {vidFiles.name}, 'UniformOutput', false);
+		vidFiles = vidFiles(cellfun(@(x) isempty(strfind(x, '_cropped')), vidFiles)); % Filter out videos that are already cropped.
+
+		% Store video file name
+		Params(iDir).Video(1).File = vidFiles{1}(1:end-4);
+		Params(iDir).Video(2).File = vidFiles{2}(1:end-4);
 
 		% Retrieve alignment param
 		% TODO: handle more than 2 videos
