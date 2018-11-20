@@ -75,8 +75,8 @@ for iDir = 1:length(dirs)
 		% Store trim params
 		Params(iDir).Video(1).FrameNumber = frame1Up;
 		Params(iDir).Video(2).FrameNumber = frame2Up;
-		Params(iDir).Video(1).Timestamp = t1Up;
-		Params(iDir).Video(2).Timestamp = t2Up;
+		Params(iDir).Video(1).Timestamp = datetime(t1Up, 'ConvertFrom', 'datenum', 'TimeZone', 'America/New_York');
+		Params(iDir).Video(2).Timestamp = datetime(t2Up, 'ConvertFrom', 'datenum', 'TimeZone', 'America/New_York');
 
 		% Prompt for video cropping
 		% First video

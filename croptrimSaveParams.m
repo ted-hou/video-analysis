@@ -7,5 +7,6 @@ for iParam = 1:length(Params)
 		Time 	= thisVid.Timestamp;
 		Crop 	= thisVid.Crop;
 		save([Params(iParam).Video(iVid).File, '_vidparams'], 'File', 'Frame', 'Time', 'Crop');
+		% save([Params(iParam).Video(iVid).File, '_vidparams'], 'File', 'Frame', 'Time', '-append');
 	end
 end
