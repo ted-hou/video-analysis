@@ -114,9 +114,15 @@ for iDir = 1:length(dirs)
 				img = read(vid, 1);
 				image(hAxes, img);
 				axis(hAxes, 'image');
-				hRect(iVid) = drawrectangle(hAxes, 'Deletable', false, 'Position', [0.5, 0.5, size(img, 2), size(img, 1)]);
+				if iDir == 1
+					defaultCrop = [0.5, 0.5, size(img, 2), size(img, 1)];
+				else
+					defaultCrop = Params(iDir - 1).Video(iVid).Crop;
+				end
+				hRect(iVid) = drawrectangle(hAxes, 'Deletable', false, 'Position', defaultCrop);
 			end
 			input('Say something nice to me to continue...\n', 's');
+			crop = round(transpose(reshape([hRect.Position], 4, [])));
 			Params(iDir).Video(1).Crop = crop(1, :);
 			Params(iDir).Video(2).Crop = crop(2, :);
 			close(hFigure)

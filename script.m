@@ -1,3 +1,14 @@
+%% 
+croptrimGetParams()
+croptrimSaveParams()
+save('C:\Server\params2.mat', 'Params')
+
+% in anaconda terminal:
+cd C:\GIT\video-analysis
+python croptrimExec.py
+
+%%
+
 datetime.setDefaultFormats('default','yyyy-MM-dd hh:mm:ss.SSSS Z')
 
 cd('D:\DeepLabCut\videos')
