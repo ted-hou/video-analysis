@@ -8,7 +8,7 @@ Load params generated in MATLAB and execute video processing.
 from scipy.io import loadmat
 import os, subprocess
 
-params = loadmat('C:\Server\params2.mat')
+params = loadmat('C:\Server\params.mat')
 params = params['Params']
 for iDir in range(params.size):
     for iVid in range(params[0, iDir]['Video'].size):
