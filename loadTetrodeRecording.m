@@ -1,4 +1,4 @@
-function [TR, VTD, I] = loadTetrodeRecording(VTD)
+function [TR, VTD, I, expNames] = loadTetrodeRecording(VTD)
 	expNames = cellfun(@(x) strsplit(x, '\'), {VTD.File}, 'UniformOutput', false);
 	expNames = cellfun(@(x) x{end-1}, expNames, 'UniformOutput', false);
 
