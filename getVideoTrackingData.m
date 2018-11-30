@@ -4,8 +4,6 @@ function VideoTrackingData = getVideoTrackingData()
 	numFiles = length(csvlist);
 	split = cellfun(@(x) strsplit(x, '_'), {csvlist.name}, 'UniformOutput', false);
 
-	clear VideoTrackingData
-
 	for iFile = 1:numFiles
 		thisMouse = split{iFile}{1};
 		thisDate = split{iFile}{2};
