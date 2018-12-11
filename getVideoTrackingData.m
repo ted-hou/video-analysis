@@ -1,16 +1,21 @@
 function VideoTrackingData = getVideoTrackingData()
-	csvlist = dir('*.csv');
-	csvlist = csvlist(~[csvlist.isdir]);
-	numFiles = length(csvlist);
-	split = cellfun(@(x) strsplit(x, '_'), {csvlist.name}, 'UniformOutput', false);
+	[files, dirname] = uigetfile('C:\SERVER\VideoTracking\*.csv', 'MultiSelect', 'on');
+	numFiles = length(files);
+	split = cellfun(@(x) strsplit(x, '_'), files, 'UniformOutput', false);
 
 	for iFile = 1:numFiles
+		fprintf('Loading file %d/%d...', iFile, numFiles)
+
 		thisMouse = split{iFile}{1};
 		thisDate = split{iFile}{2};
-		thisCamera = split{iFile}{3};
+		if length(split{iFile}) < 7
+			thisFile = dir(['C:\SERVER\**\', thisMouse, '_', thisDate, '_vidparams.mat']);
+		else
+			thisCamera = split{iFile}{3};
+			thisFile = dir(['C:\SERVER\**\', thisMouse, '_', thisDate, '_', thisCamera, '_vidparams.mat']);
+		end
 
 		% Find corresponding crop/trim param file on server
-		thisFile = dir(['C:\SERVER\**\', thisMouse, '_', thisDate, '_', thisCamera, '_vidparams.mat']);
 		thisFile = [thisFile.folder, '\', thisFile.name];
 		S = load(thisFile);
 
@@ -20,7 +25,7 @@ function VideoTrackingData = getVideoTrackingData()
 		VideoTrackingData(iFile).Crop = S.Crop;
 
 		% Load csv
-		thisData = importdata(csvlist(iFile).name);
+		thisData = importdata([dirname, files{iFile}]);
 		numBodyParts = (size(thisData.data, 2) - 1)/3;
 		bodyPartNames = strsplit(thisData.textdata{2, 1}, ',');
 		for iBodyPart = 1:numBodyParts
@@ -31,4 +36,5 @@ function VideoTrackingData = getVideoTrackingData()
 			VideoTrackingData(iFile).BodyPart(iBodyPart).Y = thisData.data(:, iCol + 1);
 			VideoTrackingData(iFile).BodyPart(iBodyPart).Likelihood = thisData.data(:, iCol + 2);
 		end
+		fprintf('Done!\n')
 	end
