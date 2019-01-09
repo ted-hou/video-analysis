@@ -19,24 +19,7 @@ for iVtd = 1:length(vtd)
 end
 clear iVtd
 
-%%
-% for iTr = 1:length(tr)
-for iTr = 1:16
-	posX = [vtd(iTr).BodyPart(2).X];
-	posY = [vtd(iTr).BodyPart(2).Y];
 
-	pos = [0; sqrt(diff(posX).^2 + diff(posY).^2)];
-
-	prob = [vtd(iTr).BodyPart(2).Likelihood];
-
-	samplingFreq = (length(vtd(iTr).Time) - 1)/seconds(vtd(iTr).Time(end) - vtd(iTr).Time(1));
-	t = milliseconds(vtd(iTr).Time - vtd(iTr).Time(1));
-	cutOffFreq = 0.001;
-
-	figure(iTr)
-	hold on
-	plot(t, lowpass(pos, cutOffFreq, samplingFreq), 'r')
-	plot(milliseconds(tr(iTr).GetStartTime() + seconds(tr(iTr).DigitalEvents.PressOn) - vtd(iTr).Time(1)), 250, 'ro')
-	hold off
-	title(['LP - ', num2str(cutOffFreq), ' Hz'])
+for iTr = 1:length(tr)
+	plotBodyPart(vtd, tr, iTr, 2, 'SmoothingWindow', [2 2], 'SmoothingMethod', 'movmean', 'Window', [0, 2]);
 end
