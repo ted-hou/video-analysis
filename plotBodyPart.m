@@ -193,3 +193,4 @@ function varargout = plotBodyPart(vtd, tr, iTr, varargin)
 	legend(ax33, ['threshold (', num2str(numSigmas), '\sigma) = ', num2str(speedSigma)], 'Location', 'best')
 
 	varargout = {xLowPass, yLowPass, speedLowPass, x, y, speed, t, reference, event};
+end
