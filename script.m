@@ -39,3 +39,25 @@ va.ProcessData('FrontRightPaw', 'Window', [0, 2], 'SmoothingMethod', 'movmean', 
 
 va.Plot('FrontRightPaw');
 va.Hist('FrontRightPaw');
+
+% Get vid clip
+for iVa = 1:length(va)
+	clip{iVa} = va(iVa).GetVideoClip(cellfun(@(data) data(2).Speed.MoveTimeAbs, {va(iVa).Trials.BodyPart}), 'TrackingDataType', 'Smooth', 'BodyPart', 'all');
+end
+clip = vertcat(clip{:});
+
+% View video clip
+iClip = 1;
+while iClip <= length(clip)
+	f = figure('Units', 'normalized', 'Position', [0 0 0.3 0.3]);
+	ax = axes(f);
+	title(ax, [num2str(iClip), ' / ', num2str(length(clip))]);
+	implay(clip{iClip})
+	iskb = waitforbuttonpress;
+	if iskb
+		iClip = max(1, iClip - 1);
+	else
+		iClip = iClip + 1;
+	end
+close all force
+end
