@@ -185,21 +185,40 @@ classdef VideoAnalysis < handle
 			end
 		end
 
+		function Hist(obj, bodyPart, varargin)
+			p = inputParser;
+			addRequired(p, 'BodyPart', @(x) isnumeric(x) || ischar(x));
+			addParameter(p, 'TLim', [-2 1], @(x) isnumeric(x) || ischar(x));
+			parse(p, bodyPart, varargin{:});
+			bodyPart = p.Results.BodyPart;
+			tLim	 = p.Results.TLim;
+
+			obj.Plot(bodyPart, 'TLim', tLim, 'PlotSeparateSessions', false)
+		end
+
 		function Plot(obj, bodyPart, varargin)
 			p = inputParser;
 			addRequired(p, 'BodyPart', @(x) isnumeric(x) || ischar(x));
 			addParameter(p, 'PlotLikelihood', false, @islogical);
 			addParameter(p, 'TLim', [-2 1], @(x) isnumeric(x) || ischar(x));
+			addParameter(p, 'PlotSeparateSessions', true, @islogical);
 			parse(p, bodyPart, varargin{:});
-			bodyPart		= p.Results.BodyPart;
-			plotLikelihood 	= p.Results.PlotLikelihood;
-			tLim	 		= p.Results.TLim;
+			bodyPart				= p.Results.BodyPart;
+			plotLikelihood 			= p.Results.PlotLikelihood;
+			tLim	 				= p.Results.TLim;
+			plotSeparateSessions 	= p.Results.PlotSeparateSessions;
 
 			if ischar(bodyPart)
 				iBodyPart = find(strcmpi(bodyPart, {obj(1).VideoTrackingData.BodyPart.Name}));
 			elseif isnumeric(bodyPart)
 				iBodyPart = bodyPart;
 			end
+
+			edges = -10:0.1:2;
+			centers = (edges(1:end-1) + edges(2:end))/2;
+			xCountsTotal = zeros(size(centers));
+			yCountsTotal = zeros(size(centers));
+			speedCountsTotal = zeros(size(centers));
 
 			for iObj = 1:length(obj)
 				xSmooth = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).XSmooth;
@@ -219,140 +238,158 @@ classdef VideoAnalysis < handle
 				referenceName = obj(iObj).Events.ReferenceName;
 				eventName = obj(iObj).Events.EventName;
 
-				f = figure();
-				f.OuterPosition = [50 50 1820 980];
-				% Plot the whole trace
-				ax1 = subplot('Position', [-0.15, 2/3, 1.15, 1/3]);
-				ax1.OuterPosition = ax1.Position;
-				hold on
-				h = plot(ax1, t, xSmooth - median(xSmooth), 'b'); h.DisplayName = 'X Position (px)';
-				h = plot(ax1, t, ySmooth - median(ySmooth), 'r'); h.DisplayName = 'Y Position (px)';
-				h = plot(ax1, t, speedSmooth - mean(speedSmooth), 'k'); h.DisplayName = 'Speed (px/s)';
-				yRange = [xSmooth - median(xSmooth); ySmooth - median(ySmooth); speedSmooth - mean(speedSmooth)];
-				yRange = max(abs(yRange))*[-1, 1];
-				for iReference = 1:length(reference)
-					h = plot([reference(iReference), reference(iReference)], yRange, 'g:'); h.Annotation.LegendInformation.IconDisplayStyle = 'off';
-				end
-				for iEvent = 1:length(event)
-					h = plot([event(iEvent), event(iEvent)], yRange, 'r:'); h.Annotation.LegendInformation.IconDisplayStyle = 'off';
-				end
-				if plotLikelihood
-					h = scatter(t, speedSmooth, 1*(10-5*prob), 1-prob); h.Annotation.LegendInformation.IconDisplayStyle = 'off';
-				end
-				hold off
-				if plotLikelihood
-					colormap(ax1, 'parula')
-					colorbar(ax1)
-				end
-				title(ax1, [obj(iObj).TetrodeRecording.GetExpName(), ' - ', obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Name], 'Interpreter', 'none')
-				legend(ax1);
-				set(ax1, 'YLim', yRange)
-
-				% Plot traces from trial start to movement, aligned on movement	
-				ax21 = subplot('Position', [0, 1/3, 1/4, 1/3]); title('X Position'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('X (px)')
-				ax22 = subplot('Position', [1/4, 1/3, 1/4, 1/3]); title('Y Position'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('Y (px)')
-				ax23 = subplot('Position', [2/4, 1/3, 1/4, 1/3]); title('Speed'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('Speed (px/s)')
-				ax24 = subplot('Position', [3/4, 1/3, 1/4, 1/3]); title('X/Y Position'), zlabel(['Time relative to ', eventName, ' (s)']), xlabel('X (px)'), ylabel('Y (px)')
-
-				ax31 = subplot('Position', [0, 0, 1/4, 1/3]); title('X Position'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('X (z-score)')
-				ax32 = subplot('Position', [1/4, 0, 1/4, 1/3]); title('Y Position'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('Y (z-score)')
-				ax33 = subplot('Position', [2/4, 0, 1/4, 1/3]); title('Speed'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('Speed (z-score)')
-				ax34 = subplot('Position', [3/4, 0, 1/4, 1/3]); title('X/Y Position'), zlabel(['Time relative to ', eventName, ' (s)']), xlabel('X (z-score)'), ylabel('Y (z-score)')
-
-				ax21.OuterPosition = ax21.Position;
-				ax22.OuterPosition = ax22.Position;
-				ax23.OuterPosition = ax23.Position;
-				ax24.OuterPosition = ax24.Position;
-				ax31.OuterPosition = ax31.Position;
-				ax32.OuterPosition = ax32.Position;
-				ax33.OuterPosition = ax33.Position;
-				ax34.OuterPosition = ax34.Position;
-				hold(ax21, 'on')
-				hold(ax22, 'on')
-				hold(ax23, 'on')
-				hold(ax24, 'on')
-				hold(ax31, 'on')
-				hold(ax32, 'on')
-				hold(ax33, 'on')
-				hold(ax34, 'on')
-
-				for iTrial = 1:length(obj(iObj).Trials)
-					if obj(iObj).Trials(iTrial).Length >= 4
-						color = [.8 .1 .1];
-					else
-						color = [.1 .8 .1];
+				if plotSeparateSessions
+					f = figure();
+					f.OuterPosition = [50 50 1820 980];
+					% Plot the whole trace
+					ax1 = subplot('Position', [-0.15, 2/3, 1.15, 1/3]);
+					ax1.OuterPosition = ax1.Position;
+					hold on
+					h = plot(ax1, t, xSmooth - median(xSmooth), 'b'); h.DisplayName = 'X Position (px)';
+					h = plot(ax1, t, ySmooth - median(ySmooth), 'r'); h.DisplayName = 'Y Position (px)';
+					h = plot(ax1, t, speedSmooth - mean(speedSmooth), 'k'); h.DisplayName = 'Speed (px/s)';
+					yRange = [xSmooth - median(xSmooth); ySmooth - median(ySmooth); speedSmooth - mean(speedSmooth)];
+					yRange = max(abs(yRange))*[-1, 1];
+					for iReference = 1:length(reference)
+						h = plot([reference(iReference), reference(iReference)], yRange, 'g:'); h.Annotation.LegendInformation.IconDisplayStyle = 'off';
 					end
-					tWindow = obj(iObj).Trials(iTrial).TimeRel;
+					for iEvent = 1:length(event)
+						h = plot([event(iEvent), event(iEvent)], yRange, 'r:'); h.Annotation.LegendInformation.IconDisplayStyle = 'off';
+					end
+					if plotLikelihood
+						h = scatter(t, speedSmooth, 1*(10-5*prob), 1-prob); h.Annotation.LegendInformation.IconDisplayStyle = 'off';
+					end
+					hold off
+					if plotLikelihood
+						colormap(ax1, 'parula')
+						colorbar(ax1)
+					end
+					title(ax1, [obj(iObj).TetrodeRecording.GetExpName(), ' - ', obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Name], 'Interpreter', 'none')
+					legend(ax1);
+					set(ax1, 'YLim', yRange)
 
-					data = obj(iObj).Trials(iTrial).BodyPart(iBodyPart);
-					vtd = obj(iObj).VideoTrackingData.BodyPart(iBodyPart);
+					% Plot traces from trial start to movement, aligned on movement	
+					ax21 = subplot('Position', [0, 1/3, 1/4, 1/3]); title('X Position'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('X (px)')
+					ax22 = subplot('Position', [1/4, 1/3, 1/4, 1/3]); title('Y Position'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('Y (px)')
+					ax23 = subplot('Position', [2/4, 1/3, 1/4, 1/3]); title('Speed'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('Speed (px/s)')
+					ax24 = subplot('Position', [3/4, 1/3, 1/4, 1/3]); title('X/Y Position'), zlabel(['Time relative to ', eventName, ' (s)']), xlabel('X (px)'), ylabel('Y (px)')
 
-					plot(ax21, tWindow, data.X.Smooth, '-', 'LineWidth', 0.1, 'Color', color);
-					plot(ax22, tWindow, data.Y.Smooth, '-', 'LineWidth', 0.1, 'Color', color);
-					plot(ax23, tWindow, data.Speed.Smooth, '-', 'LineWidth', 0.1, 'Color', color);
-					plot3(ax24, data.X.Smooth, data.Y.Smooth, tWindow, 'Color', color);
-					plot(ax31, tWindow, data.X.Normalized, '-', 'LineWidth', 0.1, 'Color', color);
-					plot(ax32, tWindow, data.Y.Normalized, '-', 'LineWidth', 0.1, 'Color', color);
-					plot(ax33, tWindow, data.Speed.Normalized, '-', 'LineWidth', 0.1, 'Color', color);
-					plot3(ax34, data.X.Normalized, data.Y.Normalized, tWindow, 'Color', color);
+					ax31 = subplot('Position', [0, 0, 1/4, 1/3]); title('X Position'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('X (z-score)')
+					ax32 = subplot('Position', [1/4, 0, 1/4, 1/3]); title('Y Position'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('Y (z-score)')
+					ax33 = subplot('Position', [2/4, 0, 1/4, 1/3]); title('Speed'), xlabel(['Time relative to ', eventName, ' (s)']), ylabel('Speed (z-score)')
+					ax34 = subplot('Position', [3/4, 0, 1/4, 1/3]); title('X/Y Position'), zlabel(['Time relative to ', eventName, ' (s)']), xlabel('X (z-score)'), ylabel('Y (z-score)')
+
+					ax21.OuterPosition = ax21.Position;
+					ax22.OuterPosition = ax22.Position;
+					ax23.OuterPosition = ax23.Position;
+					ax24.OuterPosition = ax24.Position;
+					ax31.OuterPosition = ax31.Position;
+					ax32.OuterPosition = ax32.Position;
+					ax33.OuterPosition = ax33.Position;
+					ax34.OuterPosition = ax34.Position;
+					hold(ax21, 'on')
+					hold(ax22, 'on')
+					hold(ax23, 'on')
+					hold(ax24, 'on')
+					hold(ax31, 'on')
+					hold(ax32, 'on')
+					hold(ax33, 'on')
+					hold(ax34, 'on')
+
+					for iTrial = 1:length(obj(iObj).Trials)
+						if obj(iObj).Trials(iTrial).Length >= 4
+							color = [.8 .1 .1];
+						else
+							color = [.1 .8 .1];
+						end
+						tWindow = obj(iObj).Trials(iTrial).TimeRel;
+
+						data = obj(iObj).Trials(iTrial).BodyPart(iBodyPart);
+						vtd = obj(iObj).VideoTrackingData.BodyPart(iBodyPart);
+
+						plot(ax21, tWindow, data.X.Smooth, '-', 'LineWidth', 0.1, 'Color', color);
+						plot(ax22, tWindow, data.Y.Smooth, '-', 'LineWidth', 0.1, 'Color', color);
+						plot(ax23, tWindow, data.Speed.Smooth, '-', 'LineWidth', 0.1, 'Color', color);
+						plot3(ax24, data.X.Smooth, data.Y.Smooth, tWindow, 'Color', color);
+						plot(ax31, tWindow, data.X.Normalized, '-', 'LineWidth', 0.1, 'Color', color);
+						plot(ax32, tWindow, data.Y.Normalized, '-', 'LineWidth', 0.1, 'Color', color);
+						plot(ax33, tWindow, data.Speed.Normalized, '-', 'LineWidth', 0.1, 'Color', color);
+						plot3(ax34, data.X.Normalized, data.Y.Normalized, tWindow, 'Color', color);
+					end
 				end
 
 				% Plot move times
 				xTime = cellfun(@(data) data(iBodyPart).X.MoveTime, {obj(iObj).Trials.BodyPart});
-				yTime = cellfun(@(data) data(iBodyPart).X.MoveTime, {obj(iObj).Trials.BodyPart});
-				speedTime = cellfun(@(data) data(iBodyPart).X.MoveTime, {obj(iObj).Trials.BodyPart});
+				yTime = cellfun(@(data) data(iBodyPart).Y.MoveTime, {obj(iObj).Trials.BodyPart});
+				speedTime = cellfun(@(data) data(iBodyPart).Speed.MoveTime, {obj(iObj).Trials.BodyPart});
 
-				edges = -10:0.1:2;
-				centers = (edges(1:end-1) + edges(2:end))/2;
 				xCounts = histcounts(xTime, edges);
 				yCounts = histcounts(yTime, edges);
 				speedCounts = histcounts(speedTime, edges);
 
-				plot(ax31, centers, xCounts, 'ko');
-				plot(ax32, centers, xCounts, 'ko');
-				plot(ax33, centers, xCounts, 'ko');
+				xCountsTotal = xCountsTotal + xCounts;
+				yCountsTotal = yCountsTotal + yCounts;
+				speedCountsTotal = speedCountsTotal + speedCounts;
 
-				% Vertical line at t = 0
-				plot(ax21, [0, 0], ax21.YLim, 'k--', 'LineWidth', 2);
-				plot(ax22, [0, 0], ax22.YLim, 'k--', 'LineWidth', 2);
-				plot(ax23, [0, 0], ax23.YLim, 'k--', 'LineWidth', 2);
-				plot(ax31, [0, 0], ax31.YLim, 'k--', 'LineWidth', 2);
-				plot(ax32, [0, 0], ax32.YLim, 'k--', 'LineWidth', 2);
-				plot(ax33, [0, 0], ax33.YLim, 'k--', 'LineWidth', 2);
-				% Plane at t = 0
-				[X, Y] = meshgrid(linspace(ax24.XLim(1), ax24.XLim(2), 10), linspace(ax24.YLim(1), ax24.YLim(2), 10));
-				surf(ax24, X, Y, zeros(size(X)), 'FaceAlpha', 0.75);
-				[X, Y] = meshgrid(linspace(ax34.XLim(1), ax34.XLim(2), 10), linspace(ax34.YLim(1), ax34.YLim(2), 10));
-				surf(ax34, X, Y, zeros(size(X)), 'FaceAlpha', 0.75);
+				if plotSeparateSessions
+					plot(ax31, centers, xCounts, 'ko');
+					plot(ax32, centers, xCounts, 'ko');
+					plot(ax33, centers, xCounts, 'ko');
 
-				hold(ax21, 'off')
-				hold(ax22, 'off')
-				hold(ax23, 'off')
-				hold(ax24, 'off')
-				hold(ax31, 'off')
-				hold(ax32, 'off')
-				hold(ax33, 'off')
-				hold(ax34, 'off')
+					% Vertical line at t = 0
+					plot(ax21, [0, 0], ax21.YLim, 'k--', 'LineWidth', 2);
+					plot(ax22, [0, 0], ax22.YLim, 'k--', 'LineWidth', 2);
+					plot(ax23, [0, 0], ax23.YLim, 'k--', 'LineWidth', 2);
+					plot(ax31, [0, 0], ax31.YLim, 'k--', 'LineWidth', 2);
+					plot(ax32, [0, 0], ax32.YLim, 'k--', 'LineWidth', 2);
+					plot(ax33, [0, 0], ax33.YLim, 'k--', 'LineWidth', 2);
+					% Plane at t = 0
+					[X, Y] = meshgrid(linspace(ax24.XLim(1), ax24.XLim(2), 10), linspace(ax24.YLim(1), ax24.YLim(2), 10));
+					surf(ax24, X, Y, zeros(size(X)), 'FaceAlpha', 0.75);
+					[X, Y] = meshgrid(linspace(ax34.XLim(1), ax34.XLim(2), 10), linspace(ax34.YLim(1), ax34.YLim(2), 10));
+					surf(ax34, X, Y, zeros(size(X)), 'FaceAlpha', 0.75);
 
-				set([ax21, ax22, ax23, ax31, ax32, ax33], 'XLim', tLim)
-				set([ax24, ax34], 'ZLim', tLim)
-				set([ax24, ax34], 'ZDir', 'reverse')
-				view(ax24, 45, 30)
-				view(ax34, 45, 30)
+					hold(ax21, 'off')
+					hold(ax22, 'off')
+					hold(ax23, 'off')
+					hold(ax24, 'off')
+					hold(ax31, 'off')
+					hold(ax32, 'off')
+					hold(ax33, 'off')
+					hold(ax34, 'off')
 
-				numSigmas = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.X.NumSigmas;
-				numSigmasSpeed = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.Speed.NumSigmas;
-				xThreshold = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.X.Threshold;
-				yThreshold = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.Y.Threshold;
-				speedThreshold = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.Speed.Threshold;
+					set([ax21, ax22, ax23, ax31, ax32, ax33], 'XLim', tLim)
+					set([ax24, ax34], 'ZLim', tLim)
+					set([ax24, ax34], 'ZDir', 'reverse')
+					view(ax24, 45, 30)
+					view(ax34, 45, 30)
 
-				legend(ax21, ['threshold (', num2str(numSigmas), '\sigma) = ', num2str(xThreshold)], 'Location', 'best')
-				legend(ax22, ['threshold (', num2str(numSigmas), '\sigma) = ', num2str(yThreshold)], 'Location', 'best')
-				legend(ax23, ['threshold (', num2str(numSigmasSpeed), '\sigma) = ', num2str(speedThreshold)], 'Location', 'best')
-				legend(ax31, ['threshold (', num2str(numSigmas), '\sigma)'], 'Location', 'best')
-				legend(ax32, ['threshold (', num2str(numSigmas), '\sigma)'], 'Location', 'best')
-				legend(ax33, ['threshold (', num2str(numSigmasSpeed), '\sigma)'], 'Location', 'best')
+					numSigmas = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.X.NumSigmas;
+					numSigmasSpeed = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.Speed.NumSigmas;
+					xThreshold = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.X.Threshold;
+					yThreshold = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.Y.Threshold;
+					speedThreshold = obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.Speed.Threshold;
+
+					legend(ax21, ['threshold (', num2str(numSigmas), '\sigma) = ', num2str(xThreshold)], 'Location', 'best')
+					legend(ax22, ['threshold (', num2str(numSigmas), '\sigma) = ', num2str(yThreshold)], 'Location', 'best')
+					legend(ax23, ['threshold (', num2str(numSigmasSpeed), '\sigma) = ', num2str(speedThreshold)], 'Location', 'best')
+					legend(ax31, ['threshold (', num2str(numSigmas), '\sigma)'], 'Location', 'best')
+					legend(ax32, ['threshold (', num2str(numSigmas), '\sigma)'], 'Location', 'best')
+					legend(ax33, ['threshold (', num2str(numSigmasSpeed), '\sigma)'], 'Location', 'best')
+				end
 			end
+
+			f = figure('DefaultAxesFontSize', 14); ax = axes(f);
+			hold(ax, 'on')
+			% plot(ax, centers, xCountsTotal, 'r', 'DisplayName', 'X');
+			% plot(ax, centers, yCountsTotal, 'b', 'DisplayName', 'Y');
+			plot(ax, centers, speedCountsTotal, 'k', 'DisplayName', 'Speed');
+			hold(ax, 'off')
+			title(sprintf('Video based movement onset detection\n%d sessions/%d trials', length(obj), sum(xCountsTotal)))
+			xlabel('Movement onset relative to lever touch time (s)')
+			ylabel('Number of trials')
+			xlim(ax, tLim)
+			% legend(ax)
 		end
 
 		function clip = GetVideoClip(obj, time, varargin)
@@ -435,7 +472,7 @@ classdef VideoAnalysis < handle
 					thisFrame = insertText(thisFrame, thisPos, labels, 'TextColor', labelColors, 'BoxOpacity', 0, 'AnchorPoint', 'RightTop');
 					thisFrame = insertText(thisFrame, thisPos, thisProb, 'TextColor', labelColors, 'BoxOpacity', 0, 'AnchorPoint', 'RightBottom');
 					thisFrame = insertMarker(thisFrame, thisPos, 'Color', labelColors, 'Size', 10);
-					if iClipFrame == numFramesBefore + 1;
+					if iClipFrame == numFramesBefore + 1
 						thisFrame = insertShape(thisFrame, 'FilledRectangle', [0, 0, v.Width, v.Height], 'Color', 'red', 'Opacity', 0.7);
 					end
 					clip{iClip}(:, :, :, iClipFrame) = thisFrame;
