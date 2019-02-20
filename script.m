@@ -38,7 +38,7 @@ python croptrimExec.py
 %% 3. Analyze DLC generated teacking data (New OO method)
 va = VideoAnalysis.BatchLoad();
 va.ProcessEvents('Reference', 'CueOn', 'Event', 'PressOn');
-va.ProcessData('FrontRightPaw', 'Window', [0, 2], 'SmoothingMethod', 'movmean', 'SmoothingWindow', [1, 1], 'NumSigmas', 2, 'NumSigmasSpeed', 2);
+va.ProcessData({'FrontLeftPaw', 'FrontRightPaw'}, 'Window', [0, 2], 'SmoothingMethod', 'movmean', 'SmoothingWindow', [1, 1], 'NumSigmas', 2, 'NumSigmasSpeed', 2);
 
 va.Plot('FrontRightPaw');
 va.Hist('FrontRightPaw');
@@ -64,3 +64,21 @@ while iClip <= length(clip)
 	end
 	close all force
 end
+
+% Ah
+va = VideoAnalysis.BatchLoad();
+va.ProcessEvents('Reference', 'CueOn', 'Event', 'PressOn');
+va.ProcessData({'FrontLeftPaw', 'FrontRightPaw'}, 'Window', [0, 2], 'SmoothingMethod', 'movmean', 'SmoothingWindow', [1, 1], 'NumSigmas', 2, 'NumSigmasSpeed', 2);
+
+va.Hist('NonPositive', true, 'TLim', [-4, 0]);
+
+PETH = va.PETHistcounts(batchPlotList, false);
+PETHCorrected = va.PETHistcounts(batchPlotList, true);
+
+[~, ~, I] = TetrodeRecording.HeatMap(PETH, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 0, 'Window', [-4, 2]);
+TetrodeRecording.HeatMap(PETHCorrected, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 0, 'Window', [-4, 2], 'I', I);
+
+[~, ~, I] = TetrodeRecording.HeatMap(PETHCorrected, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 0, 'MinSpikeRate', 0, 'Window', [-4, 2]);
+TetrodeRecording.HeatMap(PETH, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 0, 'MinSpikeRate', 0, 'Window', [-4, 2], 'I', I);
+TetrodeRecording.HeatMap(PETH, 'Normalization', 'raw', 'Sorting', 'latency', 'MinNumTrials', 0, 'MinSpikeRate', 0, 'Window', [-4, 2], 'I', I);
+TetrodeRecording.HeatMap(PETHCorrected, 'Normalization', 'raw', 'Sorting', 'latency', 'MinNumTrials', 0, 'MinSpikeRate', 0, 'Window', [-4, 2], 'I', I);

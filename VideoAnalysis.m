@@ -162,7 +162,6 @@ classdef VideoAnalysis < handle
 						obj(iObj).Trials(iTrial).BodyPart(iBodyPart).Prob = prob(inWindow);
 
 						obj(iObj).Trials(iTrial).Length = obj(iObj).Trials(iTrial).TimeAbs(end) - obj(iObj).Trials(iTrial).TimeAbs(1);
-
 					end
 
 					% Store shit
@@ -182,18 +181,57 @@ classdef VideoAnalysis < handle
 					obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.Y = struct('Threshold', numSigmas*ySigma, 'Sigma', ySigma, 'NumSigmas', numSigmas);
 					obj(iObj).VideoTrackingData.BodyPart(iBodyPart).Stats.Speed = struct('Threshold', numSigmasSpeed*speedSigma, 'Sigma', speedSigma, 'NumSigmas', numSigmasSpeed);
 				end
+
+				% Combine movement times from all processed bodyparts
+				for iTrial = 1:length(reference)
+					moveTimes = cellfun(@(data) data.MoveTime, {obj(iObj).Trials(iTrial).BodyPart(bodyPart).Speed});
+
+					[m, i] = min(moveTimes);
+					obj(iObj).Trials(iTrial).MoveTime = m; % Movement onset time relative to lever touch
+					obj(iObj).Trials(iTrial).FirstBodyPartToMove = obj(iObj).VideoTrackingData.BodyPart(bodyPart(i)).Name;
+				end
 			end
 		end
 
-		function Hist(obj, bodyPart, varargin)
+		function Hist(obj, varargin)
 			p = inputParser;
-			addRequired(p, 'BodyPart', @(x) isnumeric(x) || ischar(x));
 			addParameter(p, 'TLim', [-2 1], @(x) isnumeric(x) || ischar(x));
-			parse(p, bodyPart, varargin{:});
-			bodyPart = p.Results.BodyPart;
-			tLim	 = p.Results.TLim;
+			addParameter(p, 'NonPositive', true, @islogical);
+			parse(p, varargin{:});
+			tLim 			= p.Results.TLim;
+			nonPositive 	= p.Results.NonPositive;
 
-			obj.Plot(bodyPart, 'TLim', tLim, 'PlotSeparateSessions', false)
+			if nonPositive
+				edges = -10:0.05:0;
+				tLim(2) = min(0, tLim(2));
+			else
+				edges = -10:0.05:2;
+			end
+			centers = (edges(1:end-1) + edges(2:end))/2;
+			countsTotal = zeros(size(centers));
+			i = cellfun(@(x) ~isempty(x), {obj(1).Trials(1).BodyPart.Name});
+			categoryBodyParts = categorical({obj(1).Trials(1).BodyPart(i).Name});
+			bodyPartTotal = zeros(1, length(categoryBodyParts));
+
+			for iObj = 1:length(obj)
+				moveTime = [obj(iObj).Trials.MoveTime];
+				if nonPositive
+					moveTime(moveTime > 0) = 0;
+				end
+				countsTotal = countsTotal + histcounts(moveTime, edges);
+				bodyPartTotal = bodyPartTotal + histcounts(categorical({obj(iObj).Trials.FirstBodyPartToMove}), categoryBodyParts);
+			end
+
+			f = figure('DefaultAxesFontSize', 14); ax = axes(f);
+			histogram(ax, 'BinEdges', edges, 'BinCounts', countsTotal);
+			title(sprintf('Video based movement onset detection\n%d sessions/%d trials', length(obj), sum(countsTotal)))
+			xlabel('Movement onset relative to lever touch time (s)')
+			ylabel('Number of trials')
+			xlim(ax, tLim)
+
+			f = figure('DefaultAxesFontSize', 14); ax = axes(f);
+			histogram(ax, 'Categories', categoryBodyParts, 'BinCounts', bodyPartTotal);
+			title(ax, 'First bodypart to move')
 		end
 
 		function Plot(obj, bodyPart, varargin)
@@ -479,6 +517,27 @@ classdef VideoAnalysis < handle
 				end
 				fprintf('Done!\n')
 			end
+		end
+
+		function PETH = PETHistcounts(obj, list, useCorrection)
+			if nargin < 3
+				useCorrection = true;
+			end
+
+			tr = [obj.TetrodeRecording];
+			if useCorrection
+				pressOnsetCorrection = arrayfun(@(obj) [obj.Trials.MoveTime], obj, 'UniformOutput', false);
+				PETH = TetrodeRecording.BatchPETHistCounts(tr, list, 'TrialLength', 6, 'ExtendedWindow', 2, 'PressOnsetCorrection', pressOnsetCorrection);
+			else
+				PETH = TetrodeRecording.BatchPETHistCounts(tr, list, 'TrialLength', 6, 'ExtendedWindow', 2);
+			end
+		end
+
+		function HeatMap(obj, list, useCorrection)
+			if nargin < 3
+				useCorrection = true;
+			end
+			TetrodeRecording.HeatMap(obj.PETHistcounts(list, useCorrection), 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 15, 'Window', [-4, 0]);
 		end
 	end
 
