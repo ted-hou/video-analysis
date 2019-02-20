@@ -45,7 +45,9 @@ va.Hist('FrontRightPaw');
 
 % Get vid clip
 for iVa = 1:length(va)
-	clip{iVa} = va(iVa).GetVideoClip(cellfun(@(data) data(2).Speed.MoveTimeAbs, {va(iVa).Trials.BodyPart}), 'TrackingDataType', 'Smooth', 'BodyPart', 'FrontRightPaw');
+	cliptimes = cellfun(@(data) data(2).Speed.MoveTimeAbs, {va(iVa).Trials.BodyPart});
+	cliptimes = cliptimes(1:10);
+	clip{iVa} = va(iVa).GetVideoClip(cliptimes, 'TrackingDataType', 'Smooth', 'BodyPart', {'FrontRightPaw', 'FrontLeftPaw'});
 end
 clip = vertcat(clip{:});
 
@@ -70,15 +72,29 @@ va = VideoAnalysis.BatchLoad();
 va.ProcessEvents('Reference', 'CueOn', 'Event', 'PressOn');
 va.ProcessData({'FrontLeftPaw', 'FrontRightPaw'}, 'Window', [0, 2], 'SmoothingMethod', 'movmean', 'SmoothingWindow', [1, 1], 'NumSigmas', 2, 'NumSigmasSpeed', 2);
 
-va.Hist('NonPositive', true, 'TLim', [-4, 0]);
-
 PETH = va.PETHistcounts(batchPlotList, false);
 PETHCorrected = va.PETHistcounts(batchPlotList, true);
 
-[~, ~, I] = TetrodeRecording.HeatMap(PETH, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 0, 'Window', [-4, 2]);
-TetrodeRecording.HeatMap(PETHCorrected, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 0, 'Window', [-4, 2], 'I', I);
+close all
+[~, ~, I] = TetrodeRecording.HeatMap(PETH, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 15, 'Window', [-4, 1], 'NormalizationBaselineWindow', [-6, 0]);
+TetrodeRecording.HeatMap(PETHCorrected, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 15, 'Window', [-4, 1], 'NormalizationBaselineWindow', [-6, 0], 'I', I);
 
-[~, ~, I] = TetrodeRecording.HeatMap(PETHCorrected, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 0, 'MinSpikeRate', 0, 'Window', [-4, 2]);
-TetrodeRecording.HeatMap(PETH, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 0, 'MinSpikeRate', 0, 'Window', [-4, 2], 'I', I);
-TetrodeRecording.HeatMap(PETH, 'Normalization', 'raw', 'Sorting', 'latency', 'MinNumTrials', 0, 'MinSpikeRate', 0, 'Window', [-4, 2], 'I', I);
-TetrodeRecording.HeatMap(PETHCorrected, 'Normalization', 'raw', 'Sorting', 'latency', 'MinNumTrials', 0, 'MinSpikeRate', 0, 'Window', [-4, 2], 'I', I);
+ax = findobj('Type', 'Axes');
+delete(ax([1, 3]))
+ax = ax([4 2]);
+
+title(ax(1), 'Aligned to lever touch')
+title(ax(2), 'Aligned to movement onset')
+
+xlabel(ax(1), 'Time relative movement (s)')
+xlabel(ax(2), 'Time relative movement (s)')
+
+ax(1).Position = [0.2, 0.2, 0.6, 0.6];
+ax(2).Position = [0.2, 0.2, 0.6, 0.6];
+
+
+
+
+va.Hist('NonPositive', true, 'TLim', [-4, 0]);
+
+
