@@ -76,18 +76,18 @@ PETH = va.PETHistcounts(batchPlotList, false);
 PETHCorrected = va.PETHistcounts(batchPlotList, true);
 
 close all
-[~, ~, I] = TetrodeRecording.HeatMap(PETH, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 15, 'Window', [-4, 1], 'NormalizationBaselineWindow', [-6, 0]);
-TetrodeRecording.HeatMap(PETHCorrected, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 15, 'Window', [-4, 1], 'NormalizationBaselineWindow', [-6, 0], 'I', I);
+[~, ~, I] = TetrodeRecording.HeatMap(PETH, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 15, 'Window', [-4, 0], 'NormalizationBaselineWindow', [-4, 0]);
+TetrodeRecording.HeatMap(PETHCorrected, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 15, 'Window', [-4, 0], 'NormalizationBaselineWindow', [-4, 0], 'I', I);
 
 ax = findobj('Type', 'Axes');
 delete(ax([1, 3]))
 ax = ax([4 2]);
 
-title(ax(1), 'Aligned to lever touch')
-title(ax(2), 'Aligned to movement onset')
+title(ax(1), 'Aligned to lever-touch')
+title(ax(2), 'Aligned to move onset')
 
-xlabel(ax(1), 'Time relative movement (s)')
-xlabel(ax(2), 'Time relative movement (s)')
+xlabel(ax(1), 'Time relative to lever-touch (s)')
+xlabel(ax(2), 'Time relative to move onset (s)')
 
 ax(1).Position = [0.2, 0.2, 0.6, 0.6];
 ax(2).Position = [0.2, 0.2, 0.6, 0.6];
