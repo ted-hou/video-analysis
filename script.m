@@ -1,100 +1,142 @@
-%% 1. Crop/trim videos
-croptrimGetParams()
-croptrimSaveParams()
-save('C:\Server\params.mat', 'Params')
 
-% in anaconda terminal:
-cd C:\GIT\video-analysis
-python croptrimExec.py
-
-%% 2. Run DLC on cropped videos
+%% Read tetrode recording (SLOW!!!)
+fname_tr = 'tr_sorted_daisy10_20211020.mat';
+load(fname_tr)
 
 
-%% 3. [OBSOLETE] Analyze DLC generated teacking data (loose scripts)
-% datetime.setDefaultFormats('default','yyyy-MM-dd hh:mm:ss.SSSS Z')
+%%
+smoothingWindow_jointVel = 10;
+smoothingWindow_spikeCount = 10;
 
-% cd('C:\SERVER\VideoTracking')
-% vtd = getVideoTrackingData();
-% [tr, vtd] = loadTetrodeRecording(vtd);
+%% Read video tracking data, csv to table
+fname_vtd = 'daisy10_20211020_1croppedDLC_resnet101_daisy910Dec8shuffle1_800000.csv';
+opts = detectImportOptions(fname_vtd, 'NumHeaderLines', 3);
+opts.VariableNamesLine = 2;
+vtd = readtable(fname_vtd, opts);
 
-% for iVtd = 1:length(vtd)
-% 	vtd(iVtd).NumMissingFrames = length(vtd(iVtd).Time) - length(vtd(iVtd).BodyPart(1).X);
-% end
-% clear iVtd
-
-% close all
-% for iTr = 1:length(tr)
-% 	try
-% 		plotBodyPart(vtd, tr, iTr, 2, 'SmoothingWindow', [1 1], 'SmoothingMethod', 'movmean', 'Window', [0, 2], 'TLim', [-7, 2], 'NumSigmas', 2);
-% 	catch ME
-% 		warning(['Error when processing file ', num2str(iTr), '!'])
-% 		warning(sprintf('Error in program %s.\nTraceback (most recent at top):\n%s\nError Message:\n%s', mfilename, getcallstack(ME), ME.message))
-% 	end				
-% end
-% clear iTr
-
-
-
-%% 3. Analyze DLC generated teacking data (New OO method)
-va = VideoAnalysis.BatchLoad();
-va.ProcessEvents('Reference', 'CueOn', 'Event', 'PressOn');
-va.ProcessData({'FrontLeftPaw', 'FrontRightPaw'}, 'Window', [0, 2], 'SmoothingMethod', 'movmean', 'SmoothingWindow', [1, 1], 'NumSigmas', 2, 'NumSigmasSpeed', 2);
-
-va.Plot('FrontRightPaw');
-va.Hist('FrontRightPaw');
-
-% Get vid clip
-for iVa = 1:length(va)
-	cliptimes = cellfun(@(data) data(2).Speed.MoveTimeAbs, {va(iVa).Trials.BodyPart});
-	cliptimes = cliptimes(1:10);
-	clip{iVa} = va(iVa).GetVideoClip(cliptimes, 'TrackingDataType', 'Smooth', 'BodyPart', {'FrontRightPaw', 'FrontLeftPaw'});
+% Set colnames
+vtd.Properties.VariableNames{1} = 'FrameNumber';
+w = length(vtd.Properties.VariableNames);
+for i = 2:w
+    splitName = strsplit(vtd.Properties.VariableNames{i}, '_');
+    if length(splitName) == 1
+        vtd.Properties.VariableNames{i} = [splitName{1}, '_X'];
+        pos = table2array(smoothdata(vtd(:, i:i+1), 'gaussian', smoothingWindow_jointVel));
+        vel = [0, 0; diff(pos, 1)];
+        spd = sqrt(sum(vel.^2, 2));
+        vtd = addvars(vtd, vel(:, 1), vel(:, 2), spd, 'NewVariableNames', {[splitName{1}, '_VelX'], [splitName{1}, '_VelY'], [splitName{1}, '_Speed']});
+    elseif splitName{2} == '1'
+        vtd.Properties.VariableNames{i} = [splitName{1}, '_Y'];
+    elseif splitName{2} == '2'
+        vtd.Properties.VariableNames{i} = [splitName{1}, '_Likelihood'];
+    end
 end
-clip = vertcat(clip{:});
+clear i opts splitName w pos vel spd
 
-% View video clip
-iClip = 1;
-while iClip <= length(clip)
-	f = figure('Units', 'normalized', 'Position', [0 0 0.3 0.3]);
-	ax = axes(f);
-	title(ax, [num2str(iClip), ' / ', num2str(length(clip))]);
-	implay(clip{iClip})
-	iskb = waitforbuttonpress;
-	if iskb
-		iClip = max(1, iClip - 1);
-	else
-		iClip = iClip + 1;
-	end
-	close all force
+
+%% Get time offset between video frame 0 and recording start time
+fname_ac = 'daisy10_20211020.mat';
+load(fname_ac), ac = obj; clear obj
+
+% CameraConnection uses DATENUM to store local time (Boston) rather than UTC, so we need to specify timezone when converting back to DATETIME.
+sparseTimestamps = datetime([ac.Cameras.Camera.EventLog.Timestamp], 'ConvertFrom', 'datenum', 'TimeZone', 'America/New_York', 'Format', 'yyyy-MM-dd HH:mm:SSS');
+sparseFrameNumbers = [ac.Cameras.Camera.EventLog.FrameNumber];
+
+% Interpolate frame timestamps b/c CameraConnection only stores timestamps
+% for every 10th frame
+vtd.FrameTimestamp = interp1(sparseFrameNumbers, sparseTimestamps, vtd.FrameNumber, 'linear');
+
+% Store timestamps as seconds after Ephys start
+vtd.EphysTimestamp = seconds(vtd.FrameTimestamp - tr.StartTime);
+
+% Truncate negative timestamps
+vtd = vtd(vtd.EphysTimestamp > 0, :);
+
+clear sparseFrameNumbers sparseTimestamps
+
+%% Process unit list
+fname_peth = 'PETH_daisy10_20211020.mat';
+load(fname_peth)
+units = cell2table(batchPlotList, 'VariableNames', {'AnimalName', 'Date', 'Electrode', 'Channel', 'Unit'});
+clear batchPlotList PETH
+
+%% Calculate spike counts across whole session
+units.SpikeCounts = zeros(height(units), height(vtd));
+for iUnit = 1:height(units)
+    sc = countspikes(tr, units.Channel(iUnit), units.Unit(iUnit), [0; vtd.EphysTimestamp]);
+    units.SpikeCounts(iUnit, :) = sc;
+    vtd = addvars(vtd, sc', smoothdata(sc', 'gaussian', smoothingWindow_spikeCount), 'NewVariableNames', {sprintf('SpikeCount_E%iU%i', units.Electrode(iUnit), units.Unit(iUnit)), sprintf('SmoothSpikeCount_E%iU%i', units.Electrode(iUnit), units.Unit(iUnit))});
+end
+clear iUnit sc
+
+%% GLM
+modelspec = cell(height(units), 1);
+models = cell(height(units), 1);
+for i = 1:height(units)
+    e = units.Electrode(i);
+    u = units.Unit(i);
+    modelspec{i} = sprintf('SmoothSpikeCount_E%iU%i ~ Jaw_Speed + Nose_Speed + Spine_Speed + Tail_Speed + ShoulderR_Speed + ElbowR_Speed + HandR_Speed + HipR_Speed + AnkleR_Speed + FootR_Speed + HandL_Speed', e, u);
+%     modelspec{i} = sprintf('SpikeCount_E%iU%i ~ Jaw_VelX + Nose_VelX + Spine_VelX + Tail_VelX + ShoulderR_VelX + ElbowR_VelX + HandR_VelX + HipR_VelX + AnkleR_VelX + FootR_VelX + HandL_VelX + Jaw_VelY + Nose_VelY + Spine_VelY + Tail_VelY + ShoulderR_VelY + ElbowR_VelY + HandR_VelY + HipR_VelY + AnkleR_VelY + FootR_VelY + HandL_VelY', e, u);
+%     modelspec{i} = sprintf('SmoothSpikeCount_E%iU%i ~ Jaw_VelX + Nose_VelX + Spine_VelX + Tail_VelX + ShoulderR_VelX + ElbowR_VelX + HandR_VelX + HipR_VelX + AnkleR_VelX + FootR_VelX + HandL_VelX + Jaw_VelY + Nose_VelY + Spine_VelY + Tail_VelY + ShoulderR_VelY + ElbowR_VelY + HandR_VelY + HipR_VelY + AnkleR_VelY + FootR_VelY + HandL_VelY', e, u);
+    mdl = fitglm(vtd, modelspec{i}, 'Distribution', 'poisson');
+    models{i} = mdl;
+%     
+%     figure(i)
+%     y = table2array(vtd(:, sprintf('SmoothSpikeCount_E%iU%i', e, u)));
+%     subplot(1, 3, 1)
+%     plot(vtd.HandR_Speed, y, '.')
+%     xlabel('HandR Speed')
+%     ylabel(sprintf('SmoothSpikeCount_E%iU%i', e, u))
+%     subplot(1, 3, 2)
+%     plot(vtd.HandR_VelX, y, '.')
+%     xlabel('HandR Vel X')
+%     subplot(1, 3, 3)
+%     plot(vtd.HandR_VelY, y, '.')
+%     xlabel('HandR Vel Y')
 end
 
-% Ah
-va = VideoAnalysis.BatchLoad();
-va.ProcessEvents('Reference', 'CueOn', 'Event', 'PressOn');
-va.ProcessData({'FrontLeftPaw', 'FrontRightPaw'}, 'Window', [0, 2], 'SmoothingMethod', 'movmean', 'SmoothingWindow', [1, 1], 'NumSigmas', 2, 'NumSigmasSpeed', 2);
-
-PETH = va.PETHistcounts(batchPlotList, false);
-PETHCorrected = va.PETHistcounts(batchPlotList, true);
-
-close all
-[~, ~, I] = TetrodeRecording.HeatMap(PETH, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 15, 'Window', [-4, 0], 'NormalizationBaselineWindow', [-4, 0]);
-TetrodeRecording.HeatMap(PETHCorrected, 'Normalization', 'zscore', 'Sorting', 'latency', 'MinNumTrials', 75, 'MinSpikeRate', 15, 'Window', [-4, 0], 'NormalizationBaselineWindow', [-4, 0], 'I', I);
-
-ax = findobj('Type', 'Axes');
-delete(ax([1, 3]))
-ax = ax([4 2]);
-
-title(ax(1), 'Aligned to lever-touch')
-title(ax(2), 'Aligned to move onset')
-
-xlabel(ax(1), 'Time relative to lever-touch (s)')
-xlabel(ax(2), 'Time relative to move onset (s)')
-
-ax(1).Position = [0.2, 0.2, 0.6, 0.6];
-ax(2).Position = [0.2, 0.2, 0.6, 0.6];
+clear i e u mdl
 
 
+%% Plot unit PETHs and significant predictors
+for i = 1:height(units)
+    [hFigure, ~, ~, hTitle] = tr.PlotUnitSimple_TwoEvents(units.Channel(i), units.Unit(i), 'LeaveSpaceForAnnotation', true, 'PlotType', 'PETH');
+    
+    coeff = models{i}.Coefficients;
+    coeff = coeff(coeff.pValue < 0.05, :);
+    coeff = sortrows(coeff, 'pValue');
+    
+    coeff_str = evalc('disp(coeff)');
+    coeff_str = strrep(coeff_str, '<strong>', '\bf');
+    coeff_str = strrep(coeff_str, '</strong>', '\rm');
+    coeff_str = strrep(coeff_str, '_', '\_');
 
+    dev = devianceTest(models{i});
+    try
+        dev_str = sprintf('\\bfChi^2-statistic vs. constant model: %.2f, p-value = %.2f\\rm\n\n', dev.chi2Stat(2), dev.pValue(2));
+    catch
+        dev_str = sprintf('\\bfF-statistic vs. constant model: %.2f, p-value = %.2f\\rm\n\n', dev.FStat(2), dev.pValue(2));
+    end
 
-va.Hist('NonPositive', true, 'TLim', [-4, 0]);
+    annotation(hFigure, 'Textbox', 'String', [dev_str, coeff_str], 'Interpreter', 'Tex', 'FontName', get(0,'FixedWidthFontName'), 'Units', 'Normalized', 'Position',[0 0 0.66 0.33], 'HorizontalAlignment', 'center', 'LineStyle', 'none');
+    ax = axes(hFigure, 'OuterPosition', [0.66, 0.1, 0.33, 0.23]);
+    hold(ax, 'on')
+    t = (0:height(models{i}.Fitted)-1) * 1/30;
+    plot(ax, t, table2array(models{i}.Variables(:, models{i}.Formula.ResponseName)) * 30, 'DisplayName', 'Data')
+    plot(ax, t, table2array(models{i}.Fitted(:, 'Response')) * 30, 'DisplayName', 'Fitted')
+    xlim(ax, [0, 60])
+    hold(ax, 'off')
+    xlabel(ax, 'Time (s)')
+    ylabel(ax, 'Spike Rate (sp/s)')
+    legend(ax)
+    title(ax, sprintf('R^2 = %f', models{i}.Rsquared.Ordinary))
+    
+    print(hFigure, hTitle.String, '-dpng')
+end
 
+clear i coeff coeff_str dev dev_str t
 
+function sc = countspikes(tr, channel, unit, edges)
+    spiketimes = tr.Spikes(channel).Timestamps(tr.Spikes(channel).Cluster.Classes == unit);
+    sc = histcounts(spiketimes, edges);
+end
