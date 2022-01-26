@@ -79,17 +79,60 @@ for iUnit = 1:height(units)
 end
 clear iUnit sc
 
+%% Get events
+clear events trialProgress
+
+events.TrialStart = getEventTimes(tr, ac, 'TRIAL_START');
+events.CueOn = getEventTimes(tr, ac, 'CUE_ON');
+events.LeverPressed = getEventTimes(tr, ac, 'LEVER_PRESSED');
+events.LickOn = getEventTimes(tr, ac, 'LICK');
+
+trialProgress.Press = getTrialProgressSignal(vtd, events.CueOn, events.LeverPressed, events.LickOn, -1, 1);
+trialProgress.Lick = getTrialProgressSignal(vtd, events.CueOn, events.LickOn, events.LeverPressed, -1, 1);
+
+vtd.InTrial_Press = trialProgress.Press.inTrial;
+vtd.InTrial_Lick = trialProgress.Lick.inTrial;
+vtd.InTrial = trialProgress.Press.inTrial | trialProgress.Lick.inTrial;
+
+vtd.TrialProgress_Press = zeros(height(vtd), 1); 
+vtd.TrialProgress_Lick = zeros(height(vtd), 1);
+vtd.TrialProgress = zeros(height(vtd), 1);
+
+vtd.TrialProgress_Press(trialProgress.Press.inTrial) = trialProgress.Press.sigy;
+vtd.TrialProgress_Lick(trialProgress.Lick.inTrial) = trialProgress.Lick.sigy;
+vtd.TrialProgress(trialProgress.Press.inTrial) = trialProgress.Press.sigy;
+vtd.TrialProgress(trialProgress.Lick.inTrial) = trialProgress.Lick.sigy;
+
+
+vtd.Progress_PreTrial_Press = zeros(height(vtd), 1);
+vtd.Progress_PostTrial_Press = zeros(height(vtd), 1);
+vtd.Progress_PreTrial_Lick = zeros(height(vtd), 1);
+vtd.Progress_PostTrial_Lick = zeros(height(vtd), 1);
+vtd.PreTrial_Press = trialProgress.Press.preTrial;
+vtd.PreTrial_Lick = trialProgress.Lick.preTrial;
+vtd.PostTrial_Press = trialProgress.Press.postTrial;
+vtd.PostTrial_Lick = trialProgress.Lick.postTrial;
+vtd.PreTrial = vtd.PreTrial_Press | vtd.PreTrial_Lick;
+vtd.PostTrial = vtd.PostTrial_Press | vtd.PostTrial_Lick;
+vtd.InWindow = vtd.InTrial | vtd.PreTrial | vtd.PostTrial;
+
+vtd.Progress_PreTrial_Press(vtd.PreTrial_Press) = trialProgress.Press.sigypre;
+vtd.Progress_PreTrial_Lick(vtd.PreTrial_Lick) = trialProgress.Lick.sigypre;
+vtd.Progress_PostTrial_Press(vtd.PostTrial_Press) = trialProgress.Press.sigypost;
+vtd.Progress_PostTrial_Lick(vtd.PostTrial_Lick) = trialProgress.Lick.sigypost;
+
+
+clear ev evname bins oddBins
+
 %% GLM
 modelspec = cell(height(units), 1);
 models = cell(height(units), 1);
 for i = 1:height(units)
     e = units.Electrode(i);
     u = units.Unit(i);
-    modelspec{i} = sprintf('SmoothSpikeCount_E%iU%i ~ Jaw_VelX*Jaw_VelY + Nose_VelX*Nose_VelY + Spine_VelX*Spine_VelY + Tail_VelX*Tail_VelY + ShoulderR_VelX*ShoulderR_VelY + ElbowR_VelX*ElbowR_VelY + HandR_VelX*HandR_VelY + HipR_VelX*HipR_VelY + AnkleR_VelX*AnkleR_VelY + FootR_VelX*FootR_VelY + HandL_VelX*HandL_VelY', e, u);
-%     modelspec{i} = sprintf('SmoothSpikeCount_E%iU%i ~ Jaw_Speed + Nose_Speed + Spine_Speed + Tail_Speed + ShoulderR_Speed + ElbowR_Speed + HandR_Speed + HipR_Speed + AnkleR_Speed + FootR_Speed + HandL_Speed', e, u);
-%     modelspec{i} = sprintf('SpikeCount_E%iU%i ~ Jaw_VelX + Nose_VelX + Spine_VelX + Tail_VelX + ShoulderR_VelX + ElbowR_VelX + HandR_VelX + HipR_VelX + AnkleR_VelX + FootR_VelX + HandL_VelX + Jaw_VelY + Nose_VelY + Spine_VelY + Tail_VelY + ShoulderR_VelY + ElbowR_VelY + HandR_VelY + HipR_VelY + AnkleR_VelY + FootR_VelY + HandL_VelY', e, u);
-%     modelspec{i} = sprintf('SmoothSpikeCount_E%iU%i ~ Jaw_VelX + Nose_VelX + Spine_VelX + Tail_VelX + ShoulderR_VelX + ElbowR_VelX + HandR_VelX + HipR_VelX + AnkleR_VelX + FootR_VelX + HandL_VelX + Jaw_VelY + Nose_VelY + Spine_VelY + Tail_VelY + ShoulderR_VelY + ElbowR_VelY + HandR_VelY + HipR_VelY + AnkleR_VelY + FootR_VelY + HandL_VelY', e, u);
-    mdl = fitglm(vtd, modelspec{i}, 'Distribution', 'poisson');
+    modelspec{i} = sprintf('SmoothSpikeCount_E%iU%i ~ TrialProgress_Lick + TrialProgress_Press + Progress_PreTrial_Press + Progress_PreTrial_Lick + Progress_PostTrial_Press + Progress_PostTrial_Lick + Jaw_VelX*Jaw_VelY + Nose_VelX*Nose_VelY + Spine_VelX*Spine_VelY + Tail_VelX*Tail_VelY + ShoulderR_VelX*ShoulderR_VelY + ElbowR_VelX*ElbowR_VelY + HandR_VelX*HandR_VelY + HipR_VelX*HipR_VelY + AnkleR_VelX*AnkleR_VelY + FootR_VelX*FootR_VelY + HandL_VelX*HandL_VelY', e, u);
+%     modelspec{i} = sprintf('SmoothSpikeCount_E%iU%i ~ TrialProgress + Jaw_VelX*Jaw_VelY + Nose_VelX*Nose_VelY + Spine_VelX*Spine_VelY + Tail_VelX*Tail_VelY + ShoulderR_VelX*ShoulderR_VelY + ElbowR_VelX*ElbowR_VelY + HandR_VelX*HandR_VelY + HipR_VelX*HipR_VelY + AnkleR_VelX*AnkleR_VelY + FootR_VelX*FootR_VelY + HandL_VelX*HandL_VelY', e, u);
+    mdl = fitglm(vtd(vtd.InWindow, :), modelspec{i}, 'Distribution', 'poisson');
     models{i} = mdl;
 %     
 %     figure(i)
@@ -150,18 +193,6 @@ end
 
 clear i coeff coeff_str dev dev_str t hFigure hTitle ax
 
-%% Get events
-events.TrialStart = getEventTimes(tr, ac, 'TRIAL_START');
-events.CueOn = getEventTimes(tr, ac, 'CUE_ON');
-events.LeverPressed = getEventTimes(tr, ac, 'LEVER_PRESSED');
-events.LickOn = getEventTimes(tr, ac, 'LICK');
-
-for evname = {'TrialStart', 'CueOn', 'LeverPressed', 'LickOn'}
-    ev = events.(evname{1});
-end
-
-clear ev evname
-
 %% Functions
 function sc = countSpikes(tr, channel, unit, edges)
     spiketimes = tr.Spikes(channel).Timestamps(tr.Spikes(channel).Cluster.Classes == unit);
@@ -170,4 +201,43 @@ end
 
 function t = getEventTimes(tr, ac, eventName)
     t = seconds(datetime(ac.EventMarkers(ac.EventMarkers(:, 1) == find(strcmpi(ac.EventMarkerNames, eventName), 1), 3), 'ConvertFrom', 'datenum', 'TimeZone', 'America/New_York') - tr.StartTime);
+    t = reshape(t, 1, []);
+end
+
+function e = getTrialProgressSignal(vtd, reference, event, eventExclude, preWindow, postWindow)
+    if nargin < 5
+        preWindow = -1;
+    end
+    if nargin < 6
+        postWindow = 1;
+    end
+
+    [e.ref, e.event, ~, ~, ~] = TetrodeRecording.FindFirstInTrial(reference, event, eventExclude);
+    e.sigx = reshape([zeros(1, length(e.ref)); ones(1, length(e.event))], 1, []);
+    e.tx = reshape([e.ref; e.event], 1, []);
+    e.txpre = reshape([e.ref + preWindow; e.ref], 1, []);
+    e.txpost = reshape([e.event; e.event + postWindow;], 1, []);
+    
+    tsx = timeseries(e.sigx, e.tx);
+    tsxpre = timeseries(e.sigx, e.txpre);
+    tsxpost = timeseries(e.sigx, e.txpost);
+    
+    [e.ty, e.inTrial] = getInTrial(e.tx, vtd.EphysTimestamp);
+    [e.typre, e.preTrial] = getInTrial(e.txpre, vtd.EphysTimestamp);
+    [e.typost, e.postTrial] = getInTrial(e.txpost, vtd.EphysTimestamp);
+    
+    tsy = resample(tsx, e.ty, 'linear');
+    tsypre = resample(tsxpre, e.typre, 'linear');
+    tsypost = resample(tsxpost, e.typost, 'linear');
+    
+    e.sigy = squeeze(tsy.Data);
+    e.sigypre = squeeze(tsypre.Data);
+    e.sigypost = squeeze(tsypost.Data);
+end
+
+function [ty, inTrial] = getInTrial(tx, ty)
+%     ty = vtd.EphysTimestamp;
+    [~, ~, bins] = histcounts(ty, tx);
+    inTrial = rem(bins, 2) ~= 0; % Keep odd bins these occur during trial.
+    ty = ty(inTrial);
 end
